@@ -1,8 +1,8 @@
 
 
-/*=== PROJECT:  JBC station prototype based on C245 ====
+/*=== PROJECT:  JBC station prototype based on DI-1 C245 ====
 	authr:    GEORGI CHAKAROV, 
-    location: Technical University branch Plovdiv, Bulgaria
+    	location: Technical University branch Plovdiv, Bulgaria
 	version:  v0, 
 	date:     2021
 */
@@ -23,11 +23,11 @@ typedef enum { false, true } bool;
  *  EEPROM: 
 		 -----------
 		|_param_val_|
-		|	250     |  // p.0 [ C ] LEVEL_TEMP1
-		|	300	 	|  // p.1 [ C ] LEVEL_TEMP2
-		|	350 	|  // p.2 [ C ] LEVEL_TEMP3
-		|	400 	|  // p.3 [ C ] LIMIT_TEMP_MAX
-		|   150 	|  // p.4 [ C ] LIMIT_TEMP_MIN
+		|   250     |  // p.0 [ C ] LEVEL_TEMP1
+		|   300	    |  // p.1 [ C ] LEVEL_TEMP2
+		|   350     |  // p.2 [ C ] LEVEL_TEMP3
+		|   400     |  // p.3 [ C ] LIMIT_TEMP_MAX
+		|   150     |  // p.4 [ C ] LIMIT_TEMP_MIN
 		 -----------
 		 -----------------------------------------------------------------------------------------
 		|_res_|___name__|_SP__|_SLEEP_TEMP_|_SLEEP_DELAY_|_HIBERN_DELAY_|_Kp_|_Ki_|_Kd_|_TEMP_adj_|
@@ -45,16 +45,16 @@ typedef enum { false, true } bool;
   * RAM MEMORY:
 		 ---------|-------------------------------------------------------------------------- 
 		|__addrs__|_CV__|_PV__|_flag_sleep_|_flag_hibern_|_Le_|_Lt_|_LRe_|_twp_|_addrs_param_|
- ---> 	| 0x3224  |  0  |  24 |    false   |    false    |  0 |  0 |  0  |  0  |    0x42C8   | 
+ --------> 	| 0x3224  |  0  |  24 |    false   |    false    |  0 |  0 |  0  |  0  |    0x42C8   | 
 |		|---------|-----------------------------------------------------------------------------------------|																											-
-|  		|		  |_res_|___name__|_SP__|_SLEEP_TEMP_|_SLEEP_DELAY_|_HIBERN_DELAY_|_Kp_|_Ki_|_Kd_|_TEMP_adj_|
+|  		|	  |_res_|___name__|_SP__|_SLEEP_TEMP_|_SLEEP_DELAY_|_HIBERN_DELAY_|_Kp_|_Ki_|_Kd_|_TEMP_adj_|
 |		| 0x42C8  | 460 |  "T245" | 300 |     180    |     2       |      15      |  0 |  0 |  0 |    0     |  // *var saved in eeprom
 |		|---------------------------------------------------------------------------------------------------|
 |		
 | * PORT[] table:                     
 |		 ---------------|----------------- const ---------------- 
 |		|indx| tool_ptr | PIN_ADC | PIN_PWM | PIN_ID | PIN_STAND |
- ---<<	|  0 | 	0x3224  |   A0    |    D5   |   D6   |    D7     |
+ ------<<       |  0 | 	0x3224  |   A0    |    D5   |   D6   |    D7     |
 		|---------------|----------------------------------------|
 
 
@@ -125,14 +125,14 @@ int main(){
 	/* CONFIRM I/O REGISTER ;;  
 	 * SET PWM output pin to zero;;
 	 * DISPLAY SHOW "STARTUP":
-		 -----------------------      
+		 ---------------------------      
 		|	      JBC           |
-		|-----------------------|
-		|	www.jbctools.com    |   
-		|   	                |
-		|  					    |				
-		| Loading profiles ...  |				
-		 -----------------------	
+		|---------------------------|
+		|      www.jbctools.com     |   
+		|   	                    |
+		|  			    |				
+		| Loading profiles ...      |				
+		 ---------------------------	
 	*/
 	long time_start = millis();
 	DISPLAY_show_startup();
@@ -208,7 +208,7 @@ int main(){
 			Calculate_Reaction( PORT[i].tool_ptr );  // PID 
 			// Latch new CV on port 
 			digitalWrite( PORT[i].PIN_PWM_OUTPUT, PORT[i].tool_ptr.CV ); 
-			DISPLAY_show_TOOLWOKR( PORT[i].tool_ptr ); 
+			DISPLAY_show_TOOLWORK( PORT[i].tool_ptr ); 
 		
 		}
 	
@@ -229,7 +229,7 @@ int main(){
 	asm volatile ("jmp 0x7800");
 }
 
-void Calculate_pid_for( TOOL *tool ){
+void Calculate_Reaction( TOOL *tool ){  // calculation with pid 
 	double e  = (( tool.flag_hibern || tool.flag_no_tool || tool.flag_error )?
 		(0): ( 
 			( tools[n].flag_sleep)? ( tools[n].param.SLEEP_TEMP ) : (tools[n].param.SP)
@@ -240,7 +240,7 @@ void Calculate_pid_for( TOOL *tool ){
 	
 	tool.LAST_Re   += e*delta_t; // sum add e(t)
 	
-    // result map 0-100%
+        // result calculate 0-100%
 	tool.CV = map((tool.param.Kp*e + tool.LAST_Re*tool.param.Ki + (delta_e/delta_t)*tool.param.Kd), -limit, +limit, 0, 100 )
 	
 	// update value
@@ -264,7 +264,17 @@ bool DISPLAY_MENU(){
 	return true;
 }
 
-void DISPLAY_show_TOOLWOKR( TOOL *tool){
+void DISPLAY_show_TOOLWORK( TOOL *tool){
+	/*
+		 --------------------------      
+		|       280  300  350      |
+		|--------------------------|
+		|	SP: [300]          |   +-5 tolerance set 
+		|	PV: 298            | 
+		|			   |
+		|   Power 3%|____|_____|   |
+		 --------------------------
+	*/
 	// WORK dislay;; 
 	// SLEEP display;;
 	// HIBER display;;
@@ -273,7 +283,7 @@ void DISPLAY_show_TOOLWOKR( TOOL *tool){
 void DISPLAY_show_startup(){
 	u8g2.clearBuffer();
 	u8g2.setFont(u8g2_font_7x14B_tf);
-    u8g2.setFontRefHeightExtendedText();
+        u8g2.setFontRefHeightExtendedText();
 	u8g2.setFontPosTop();
 	u8g2.setFontDirection(0);
 	u8g2.setDrawColor(1);
